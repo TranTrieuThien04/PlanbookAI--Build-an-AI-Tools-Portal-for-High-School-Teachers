@@ -6,4 +6,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AnswerKeyRepository extends JpaRepository<AnswerKey, Long> {
+    // Tên hàm phải khớp chính xác với tên biến 'examCode' ở trên
+    AnswerKey findByExamCode(String examCode);
 }

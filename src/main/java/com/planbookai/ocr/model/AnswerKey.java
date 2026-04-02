@@ -4,19 +4,26 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(name = "ANSWER_KEY")
+@Table(name = "answer_keys")
 @Data
 public class AnswerKey {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // PHẢI CÓ DÒNG NÀY Server mới không sập
+    @Column(name = "exam_code")
+    private String examCode;
+
+    @Column(name = "type")
+    private String type;
+
+    @Column(columnDefinition = "TEXT")
+    private String answersJson;
+
+    @Column(name = "keyword")
     private String keyword;
 
-    @Column(nullable = false)
+    @Column(name = "point")
     private Double point;
-
-    @Column(columnDefinition = "VARCHAR(255) DEFAULT 'ESSAY'")
-    private String type = "ESSAY";
 }
