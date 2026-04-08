@@ -1,34 +1,28 @@
 package com.planbookai.ocr.controller;
 
+import com.planbookai.ocr.model.AnswerKey;
+import com.planbookai.ocr.model.OcrResult;
+import com.planbookai.ocr.repository.AnswerKeyRepository;
+import com.planbookai.ocr.repository.OcrResultRepository;
+import com.planbookai.ocr.service.*;
+import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-
-import com.planbookai.ocr.model.AnswerKey;
-import com.planbookai.ocr.model.OcrResult;
-import com.planbookai.ocr.repository.AnswerKeyRepository;
-import com.planbookai.ocr.repository.OcrResultRepository;
-import com.planbookai.ocr.service.ChemistryAiService;
-import com.planbookai.ocr.service.GeminiAiService;
-import com.planbookai.ocr.service.GradingService;
-import com.planbookai.ocr.service.OmrProcessingService;
-import com.planbookai.ocr.service.ExcelExportService; // Nhớ tạo file này như tui chỉ nhé!
 
 @RestController
 @RequestMapping("/api/v1/ocr")
 public class OcrTestController {
-
     @Autowired
     private OcrResultRepository ocrResultRepository;
 
@@ -52,26 +46,33 @@ public class OcrTestController {
 
     @GetMapping("/ping")
     public String ping() {
-        return "Hệ thống AI Chấm thi THPT 2025 - PRO Version đã sẵn sàng!";
+        return "PlanbookAI - Hệ thống hỗ trợ Giáo viên THPT đã sẵn sàng!";
     }
 
+    /**
+     * STAFF: Lưu đáp án mẫu vào Question Bank
+     */
     @PostMapping("/answers/save")
+    @PreAuthorize("hasRole('STAFF')")
     public ResponseEntity<AnswerKey> saveAnswerKey(
-            @RequestBody Map<String, String> answers, 
+            @RequestBody Map<String, Object> answers, 
             @RequestParam String examCode) {
         
         AnswerKey existingKey = answerKeyRepository.findByExamCode(examCode);
         AnswerKey key = (existingKey != null) ? existingKey : new AnswerKey();
         
         key.setExamCode(examCode);
-        key.setType("CHOICE_TEXT");
-        key.setAnswersJson(new org.json.JSONObject(answers).toString());
+        key.setType("NEW_CURRICULUM_2025");
+        key.setAnswersJson(new JSONObject(answers).toString());
         
         return ResponseEntity.ok(answerKeyRepository.save(key));
     }
 
-    // --- 1. CHẤM 1 FILE ĐƠN ---
+    /**
+     * TEACHER: Chấm bài đơn lẻ
+     */
     @PostMapping("/upload")
+    @PreAuthorize("hasAnyAuthority('TEACHER', 'ROLE_ADMIN', 'ADMIN')")
     public Object uploadImage(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "mode", defaultValue = "CHOICE_TEXT") String mode,
@@ -80,8 +81,11 @@ public class OcrTestController {
         return processFile(file, mode, examCode);
     }
 
-    // --- 2. CHỨC NĂNG CHẤM HÀNG LOẠT (BATCH UPLOAD) ---
+    /**
+     * TEACHER: Chấm bài hàng loạt (Batch Upload)
+     */
     @PostMapping("/upload-batch")
+    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<List<Map<String, Object>>> uploadBatchImages(
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(value = "mode", defaultValue = "CHOICE_TEXT") String mode,
@@ -95,15 +99,18 @@ public class OcrTestController {
         return ResponseEntity.ok(batchResults);
     }
 
-    // --- 3. CHỨC NĂNG XUẤT EXCEL ---
+    /**
+     * TEACHER & MANAGER: Xuất file Excel bảng điểm
+     */
     @GetMapping("/export-excel")
+    @PreAuthorize("hasAnyRole('TEACHER', 'MANAGER')")
     public ResponseEntity<byte[]> exportExcel() {
         try {
             List<OcrResult> allResults = ocrResultRepository.findAll();
             byte[] excelContent = excelExportService.exportResultsToExcel(allResults);
 
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=BangDiem_THPT2025.xlsx")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=BangDiem_PlanbookAI.xlsx")
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .body(excelContent);
         } catch (Exception e) {
@@ -111,14 +118,14 @@ public class OcrTestController {
         }
     }
 
-    // --- HÀM XỬ LÝ CORE (Dùng chung cho cả đơn và loạt) ---
+    // --- HÀM XỬ LÝ CORE TỔNG HỢP ---
     private Object processFile(MultipartFile file, String mode, String examCode) {
         Map<String, Object> response = new HashMap<>();
         java.io.File tempFile = null;
 
         if (file.isEmpty()) {
             response.put("status", "error");
-            response.put("message", "File trống: " + file.getOriginalFilename());
+            response.put("message", "File trống!");
             return response;
         }
 
@@ -129,68 +136,55 @@ public class OcrTestController {
             String currentMode = mode.toUpperCase();
             double finalScore = 0.0;
             String studentName = "Ẩn danh";
-            String processedContent = "";
+            String rawAiContent = "";
 
             if ("OMR".equals(currentMode)) {
+                // Xử lý phiếu trắc nghiệm bằng OpenCV
                 Map<Integer, String> studentAnswers = omrProcessingService.processOmrSheet(tempFile);
-                Map<Integer, String> standardKeys = getMockStandardKeysForOMR();
-                finalScore = gradingService.calculateMultipleChoiceScore(studentAnswers, standardKeys, 10.0);
-                processedContent = studentAnswers.toString();
+                AnswerKey key = answerKeyRepository.findByExamCode(examCode);
+                // Giả định OMR chấm thang 10 truyền thống
+                finalScore = gradingService.calculateMultipleChoiceScore(studentAnswers, new HashMap<>(), 10.0);
+                rawAiContent = studentAnswers.toString();
             } else {
-                processedContent = geminiAiService.analyzeImageWithGemini(tempFile.toPath());
-                studentName = extractStudentName(processedContent);
-                processedContent = chemistryAiService.normalizeChemicalFormula(processedContent);
-
+                // Xử lý bài thi tự luận/trắc nghiệm 2025 bằng Gemini AI
+                rawAiContent = geminiAiService.analyzeImageWithGemini(tempFile.toPath());
+                
+                // Chuẩn hóa công thức hóa học & tính độ tin cậy
+                rawAiContent = chemistryAiService.normalizeChemicalFormula(rawAiContent);
+                ChemistryAiService.AiDecisionResult aiLogic = chemistryAiService.analyzeDifficultCaseWithGemini(rawAiContent);
+                
+                // Chấm điểm theo cấu trúc 3 phần của Bộ GD 2025
                 AnswerKey key = answerKeyRepository.findByExamCode(examCode);
                 if (key != null) {
-                    finalScore = gradingService.calculateNewCurriculumScore(processedContent, key.getAnswersJson());
+                    finalScore = gradingService.calculateNewCurriculumScore(aiLogic.getFinalDecision(), key.getAnswersJson());
                 }
+                
+                // Trích xuất tên học sinh từ JSON AI trả về (Giả định parse từ String)
+                studentName = new JSONObject(aiLogic.getFinalDecision()).optString("student_name", "Ẩn danh");
+                response.put("confidence", aiLogic.getConfidenceScore());
+                response.put("manual_review", aiLogic.isRequiresManualReview());
             }
 
-            // Lưu DB
+            // Lưu kết quả vào DB (FR-12)
             OcrResult entity = new OcrResult();
             entity.setStudentName(studentName);
             entity.setScore(finalScore);
-            entity.setResultJson(processedContent); 
+            entity.setResultJson(rawAiContent); 
             ocrResultRepository.save(entity);
-
-            // Clean nội dung cho nhẹ JSON
-            String cleanContent = processedContent.replace("\n", " | ").replaceAll("\\s+", " ").trim();
 
             response.put("status", "success");
             response.put("file_name", file.getOriginalFilename());
             response.put("student_name", studentName);
             response.put("score", finalScore);
-            response.put("content", cleanContent); 
 
             return response;
 
         } catch (Exception e) {
             response.put("status", "error");
-            response.put("message", "Lỗi xử lý " + file.getOriginalFilename() + ": " + e.getMessage());
+            response.put("message", "Lỗi: " + e.getMessage());
             return response;
         } finally {
             if (tempFile != null && tempFile.exists()) tempFile.delete();
         }
-    }
-
-    private String extractStudentName(String text) {
-        String regex = "(?i)(họ tên học sinh|họ và tên|họ tên|tên học sinh|tên)[:\\s\\*\\-]*([^\\n\\*\\|]+)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(text);
-        if (matcher.find()) {
-            String name = matcher.group(2).trim();
-            if (name.contains("\n")) {
-                name = name.split("\n")[0].trim();
-            }
-            return name;
-        }
-        return "Ẩn danh";
-    }
-
-    private Map<Integer, String> getMockStandardKeysForOMR() {
-        Map<Integer, String> keys = new HashMap<>();
-        keys.put(1, "A"); keys.put(2, "C"); keys.put(3, "B"); keys.put(4, "D");
-        return keys;
     }
 }
