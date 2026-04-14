@@ -1,70 +1,57 @@
 package com.planbookai.ocr.service;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class GradingService {
 
-    // --- 1. HÀM CHẤM ĐIỂM THEO CHƯƠNG TRÌNH THPT MỚI 2025 (PHẦN CHA VỪA LÀM) ---
-    public double calculateNewCurriculumScore(String studentText, String jsonAnswerKey) {
-        double totalScore = 0.0;
-        JSONObject masterKey = new JSONObject(jsonAnswerKey);
+    public double calculateNewCurriculumScore(String studentJson, String masterKeyJson) {
+        JSONObject s = new JSONObject(studentJson);
+        JSONObject m = new JSONObject(masterKeyJson);
+        double total = 0.0;
 
-        // Chấm Phần I: Trắc nghiệm 4 lựa chọn (0.25đ/câu)
-        for (int i = 1; i <= 40; i++) {
-            String key = "Câu " + i;
-            if (masterKey.has(key)) {
-                String correctAnswer = masterKey.getString(key);
-                String patternStr = "(?i)Câu\\s*" + i + "[:\\s-]*([A-D])";
-                Matcher m = Pattern.compile(patternStr).matcher(studentText);
-                if (m.find() && m.group(1).equalsIgnoreCase(correctAnswer)) {
-                    totalScore += 0.25;
-                }
+        // Phần 1: Trắc nghiệm (0.25đ/câu)
+        if (s.has("part_1")) {
+            JSONArray p1 = s.getJSONArray("part_1");
+            JSONObject k1 = m.getJSONObject("part_1");
+            for (int i = 0; i < p1.length(); i++) {
+                JSONObject q = p1.getJSONObject(i);
+                if (k1.optString(String.valueOf(q.getInt("question"))).equalsIgnoreCase(q.optString("choice"))) total += 0.25;
             }
         }
 
-        // Chấm Phần II: Trắc nghiệm Đúng/Sai (Lũy tiến 0.1, 0.25, 0.5, 1.0)
-        for (int i = 1; i <= 40; i++) {
-            String key = "Câu " + i + "_DS";
-            if (masterKey.has(key)) {
-                String correctDS = masterKey.getString(key).toUpperCase();
-                String patternStr = "(?i)Câu\\s*" + i + "[:\\s]*\\(a\\)\\s*([ĐS])\\s*\\(b\\)\\s*([ĐS])\\s*\\(c\\)\\s*([ĐS])\\s*\\(d\\)\\s*([ĐS])";
-                Matcher m = Pattern.compile(patternStr).matcher(studentText);
-                
-                if (m.find()) {
+        // Phần 2: Đúng/Sai (Điểm thưởng: 1 ý=0.1, 2 ý=0.25, 3 ý=0.5, 4 ý=1.0)
+        if (s.has("part_2")) {
+            JSONArray p2 = s.getJSONArray("part_2");
+            JSONObject k2 = m.getJSONObject("part_2");
+            for (int i = 0; i < p2.length(); i++) {
+                JSONObject q = p2.getJSONObject(i);
+                String qNum = String.valueOf(q.getInt("question"));
+                if (k2.has(qNum)) {
                     int correctCount = 0;
-                    for (int j = 0; j < 4; j++) {
-                        String studentAns = m.group(j + 1);
-                        if (studentAns.equalsIgnoreCase(String.valueOf(correctDS.charAt(j)))) {
-                            correctCount++;
-                        }
+                    JSONObject sAns = q.getJSONObject("answers");
+                    JSONObject kAns = k2.getJSONObject(qNum);
+                    for (String key : new String[]{"a", "b", "c", "d"}) {
+                        if (sAns.optString(key).equalsIgnoreCase(kAns.optString(key))) correctCount++;
                     }
-                    if (correctCount == 1) totalScore += 0.1;
-                    else if (correctCount == 2) totalScore += 0.25;
-                    else if (correctCount == 3) totalScore += 0.5;
-                    else if (correctCount == 4) totalScore += 1.0;
+                    total += (correctCount == 4 ? 1.0 : correctCount == 3 ? 0.5 : correctCount == 2 ? 0.25 : correctCount == 1 ? 0.1 : 0);
                 }
             }
         }
-        return Math.min(totalScore, 10.0);
-    }
-
-    // --- 2. HÀM CHẤM OMR (CÁI NÀY ĐANG BỊ ĐỎ NÈ CHA NỘI) ---
-    public double calculateMultipleChoiceScore(Map<Integer, String> studentAnswers, Map<Integer, String> standardKeys, double maxScore) {
-        if (standardKeys == null || standardKeys.isEmpty()) return 0.0;
         
-        int correctCount = 0;
-        for (Map.Entry<Integer, String> entry : standardKeys.entrySet()) {
-            Integer questionNum = entry.getKey();
-            String correctAnswer = entry.getValue();
-            if (studentAnswers.containsKey(questionNum) && studentAnswers.get(questionNum).equalsIgnoreCase(correctAnswer)) {
-                correctCount++;
+        // Phần 3: Trả lời ngắn (0.25đ/câu)
+        if (s.has("part_3")) {
+            JSONArray p3 = s.getJSONArray("part_3");
+            JSONObject k3 = m.getJSONObject("part_3");
+            for (int i = 0; i < p3.length(); i++) {
+                JSONObject q = p3.getJSONObject(i);
+                String qNum = String.valueOf(q.getInt("question"));
+                if (k3.has(qNum) && k3.getString(qNum).equals(q.optString("value"))) total += 0.25;
             }
         }
-        return (double) correctCount / standardKeys.size() * maxScore;
+
+        return Math.round(total * 100.0) / 100.0;
     }
 }

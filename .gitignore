@@ -1,10 +1,35 @@
-HELP.md
+# --- Java & Spring Boot (Maven) ---
 target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
 
-### STS ###
+# --- Frontend (ReactJS / Node.js) ---
+node_modules/
+build/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- IDE Settings (IntelliJ IDEA) ---
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# --- IDE Settings (Eclipse / STS) ---
 .apt_generated
 .classpath
 .factorypath
@@ -13,21 +38,17 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
+# --- IDE Settings (VS Code) ---
 .vscode/
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- PlanbookAI Specifics ---
+# Tránh đẩy các file chứa thông tin nhạy cảm như API Key Gemini
+HELP.md
+*.log
+temp/
+pba_ocr_*

@@ -1,29 +1,35 @@
 package com.planbookai.ocr.model;
 
 import jakarta.persistence.*;
-import lombok.Data;
 
 @Entity
 @Table(name = "answer_keys")
-@Data
 public class AnswerKey {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // PHẢI CÓ DÒNG NÀY Server mới không sập
     @Column(name = "exam_code")
     private String examCode;
 
-    @Column(name = "type")
     private String type;
+    private String keyword;
+    private Double point;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "answers_json", columnDefinition = "TEXT")
     private String answersJson;
 
-    @Column(name = "keyword")
-    private String keyword;
-
-    @Column(name = "point")
-    private Double point;
+    // Getter & Setter
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getExamCode() { return examCode; }
+    public void setExamCode(String examCode) { this.examCode = examCode; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    public String getKeyword() { return keyword; }
+    public void setKeyword(String keyword) { this.keyword = keyword; }
+    public Double getPoint() { return point; }
+    public void setPoint(Double point) { this.point = point; }
+    public String getAnswersJson() { return answersJson; }
+    public void setAnswersJson(String answersJson) { this.answersJson = answersJson; }
 }

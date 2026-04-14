@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,99 +20,113 @@ public class OmrProcessingService {
 
     private static final Logger logger = LoggerFactory.getLogger(OmrProcessingService.class);
 
-    // Load thư viện native của OpenCV một lần duy nhất khi Service được khởi tạo
     static {
         OpenCV.loadLocally();
     }
 
-    /**
-     * FR-06: Nhận diện đáp án trắc nghiệm (OMR - Bubble Detection)
-     * Trả về một Map chứa: Số thứ tự câu hỏi -> Đáp án (A, B, C hoặc D)
-     */
     public Map<Integer, String> processOmrSheet(File imageFile) {
-        logger.info("Bắt đầu xử lý ảnh OMR bằng OpenCV: {}", imageFile.getName());
+        logger.info("--- Đang xử lý OMR bằng OpenCV (Xử lý hàng thông minh) ---");
         Map<Integer, String> studentAnswers = new HashMap<>();
 
+        Mat src = null;
+        Mat gray = new Mat();
+        Mat blurred = new Mat();
+        Mat thresh = new Mat();
+        Mat hierarchy = new Mat();
+
         try {
-            // 1. Đọc ảnh
-            Mat src = Imgcodecs.imread(imageFile.getAbsolutePath());
-            if (src.empty()) {
-                logger.error("Không thể đọc được ảnh OMR!");
-                return studentAnswers;
-            }
+            src = Imgcodecs.imread(imageFile.getAbsolutePath());
+            if (src.empty()) return studentAnswers;
 
-            // --- FR-03: Tiền xử lý ảnh (Image Preprocessing) ---
-            Mat gray = new Mat();
-            Mat blurred = new Mat();
-            Mat thresh = new Mat();
-
-            // Chuyển sang ảnh xám (Grayscale)
+            // 1. Tiền xử lý (Pre-processing)
             Imgproc.cvtColor(src, gray, Imgproc.COLOR_BGR2GRAY);
-            
-            // Giảm nhiễu (Noise Removal) bằng GaussianBlur
             Imgproc.GaussianBlur(gray, blurred, new Size(5, 5), 0);
             
-            // Nhị phân hóa ảnh (Thresholding): Chữ đen/nền trắng -> Chữ trắng/nền đen để dễ tìm viền
+            // Dùng Otsu để tự động tìm ngưỡng trắng đen tối ưu
             Imgproc.threshold(blurred, thresh, 0, 255, Imgproc.THRESH_BINARY_INV | Imgproc.THRESH_OTSU);
 
-            // --- FR-06: Phát hiện vùng tô (Bubble Detection) ---
+            // 2. Tìm các đường bao (Contours)
             List<MatOfPoint> contours = new ArrayList<>();
-            Mat hierarchy = new Mat();
-            
-            // Tìm các đường viền (Contour Detection)
             Imgproc.findContours(thresh, contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
             List<Rect> bubbleRects = new ArrayList<>();
-
-            // Lọc ra các contours có dạng hình tròn (là các bong bóng ABCD)
             for (MatOfPoint contour : contours) {
                 Rect rect = Imgproc.boundingRect(contour);
                 float aspectRatio = (float) rect.width / rect.height;
                 
-                // Giả định bong bóng có kích thước khoảng 20x20 pixel và tỷ lệ khung hình gần bằng 1
+                // Lọc kỹ hơn để tránh bắt nhầm chữ cái hoặc dấu chấm
                 if (rect.width >= 20 && rect.height >= 20 && aspectRatio >= 0.8 && aspectRatio <= 1.2) {
                     bubbleRects.add(rect);
                 }
             }
 
-            logger.info("Phát hiện được {} bong bóng (bubbles) trên phiếu.", bubbleRects.size());
-            if (bubbleRects.size() >= 4) {
-                String[] options = {"A", "B", "C", "D"};
-                int questionNumber = 1;
-                
-                int maxPixels = 0;
-                int selectedOptionIndex = -1;
+            // --- BƯỚC QUAN TRỌNG: SẮP XẾP THEO HÀNG (Row Grouping) ---
+            // Sắp xếp theo Y trước
+            bubbleRects.sort(Comparator.comparingInt(r -> r.y));
 
-                for (int i = 0; i < 4; i++) {
-                    Rect bubble = bubbleRects.get(i);
-                    // Cắt lấy vùng ảnh riêng của bong bóng đó
+            List<List<Rect>> rows = new ArrayList<>();
+            if (!bubbleRects.isEmpty()) {
+                List<Rect> currentRow = new ArrayList<>();
+                int currentY = bubbleRects.get(0).y;
+                int thresholdY = 15; // Sai số Y cho phép trong cùng 1 hàng (tùy độ phân giải ảnh)
+
+                for (Rect r : bubbleRects) {
+                    if (Math.abs(r.y - currentY) <= thresholdY) {
+                        currentRow.add(r);
+                    } else {
+                        // Sắp xếp các ô trong hàng theo X (từ trái sang phải)
+                        currentRow.sort(Comparator.comparingInt(rect -> rect.x));
+                        rows.add(new ArrayList<>(currentRow));
+                        currentRow.clear();
+                        currentRow.add(r);
+                        currentY = r.y;
+                    }
+                }
+                currentRow.sort(Comparator.comparingInt(rect -> rect.x));
+                rows.add(currentRow);
+            }
+
+            // 3. Phân tích từng hàng để lấy đáp án
+            String[] options = {"A", "B", "C", "D"};
+            for (int i = 0; i < rows.size(); i++) {
+                List<Rect> row = rows.get(i);
+                if (row.size() < 4) continue; // Bỏ qua nếu hàng không đủ 4 ô
+
+                int questionNumber = i + 1;
+                int selectedOptionIndex = -1;
+                double maxFilledRatio = 0;
+
+                for (int j = 0; j < row.size(); j++) {
+                    if (j >= 4) break; // Chỉ lấy A, B, C, D
+                    
+                    Rect bubble = row.get(j);
                     Mat roi = thresh.submat(bubble);
                     
-                    // Đếm số lượng pixel trắng (phần được tô bút chì đen đã bị đảo màu ở bước Threshold)
                     int filledPixels = Core.countNonZero(roi);
+                    double totalPixels = bubble.width * bubble.height;
+                    double filledRatio = (double) filledPixels / totalPixels;
 
-                    // Ngưỡng (Threshold) quyết định bong bóng có được tô hay không
-                    if (filledPixels > maxPixels && filledPixels > (bubble.width * bubble.height * 0.5)) { 
-                        // Phải tô ít nhất 50% diện tích bong bóng
-                        maxPixels = filledPixels;
-                        selectedOptionIndex = i;
+                    // Ngưỡng 0.35 để xác định là có tô
+                    if (filledRatio > 0.35 && filledRatio > maxFilledRatio) {
+                        maxFilledRatio = filledRatio;
+                        selectedOptionIndex = j;
                     }
+                    roi.release();
                 }
 
                 if (selectedOptionIndex != -1) {
                     studentAnswers.put(questionNumber, options[selectedOptionIndex]);
-                    logger.info("Câu {}: Học sinh chọn đáp án {}", questionNumber, options[selectedOptionIndex]);
                 } else {
-                    logger.warn("Câu {}: Không tô đáp án hoặc tô quá mờ!", questionNumber);
-                    studentAnswers.put(questionNumber, "UNANSWERED");
+                    studentAnswers.put(questionNumber, "NOT_FOUND");
                 }
             }
 
-            // Giải phóng bộ nhớ (Quy tắc bắt buộc khi dùng OpenCV trong Java)
-            src.release(); gray.release(); blurred.release(); thresh.release(); hierarchy.release();
-
         } catch (Exception e) {
-            logger.error("Lỗi trong quá trình xử lý OMR: ", e);
+            logger.error("Lỗi OpenCV: ", e);
+        } finally {
+            // Giải phóng bộ nhớ (Cực kỳ quan trọng với OpenCV)
+            if (src != null) src.release();
+            gray.release(); blurred.release(); thresh.release(); hierarchy.release();
         }
 
         return studentAnswers;

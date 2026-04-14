@@ -36,12 +36,17 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.cors(cors -> cors.disable())
+        http.cors(cors -> cors.disable()) // Có thể bật lại nếu thầy dùng Frontend khác port
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Đã thêm "/error" để nếu có lỗi code bên trong thì nó báo lỗi thật chứ không báo 403 nữa
-                .requestMatchers("/api/v1/auth/**", "/error").permitAll() 
+                // 1. Cho phép vào trang chủ và file index.html
+                .requestMatchers("/", "/index.html", "/static/**", "/*.html", "/*.js", "/*.css").permitAll()
+                
+                // 2. Cho phép vào các API Auth và API chấm điểm (OCR) để demo không cần Token
+                .requestMatchers("/api/v1/auth/**", "/api/v1/ocr/**", "/error").permitAll() 
+                
+                // 3. Những yêu cầu khác (như Dashboard, Admin) thì mới bắt đăng nhập
                 .anyRequest().authenticated()
             );
 

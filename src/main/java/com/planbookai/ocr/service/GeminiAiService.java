@@ -1,7 +1,5 @@
 package com.planbookai.ocr.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -13,51 +11,45 @@ import java.util.*;
 
 @Service
 public class GeminiAiService {
-    private static final Logger logger = LoggerFactory.getLogger(GeminiAiService.class);
+    @Value("${gemini.api.key}") private String apiKey;
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${gemini.api.key}")
-    private String apiKey;
-
-    @SuppressWarnings("unchecked")
     public String analyzeImageWithGemini(Path imagePath) throws IOException {
-        logger.info("Đang gọi Gemini 2.5 Flash (Standard 2026) để phân tích ảnh...");
-        
-        byte[] imageBytes = Files.readAllBytes(imagePath);
-        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+        String base64 = Base64.getEncoder().encodeToString(Files.readAllBytes(imagePath));
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
-        // ĐÂY LÀ URL CHUẨN CHO NĂM 2026
-        String url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+        // Prompt tập trung 100% vào việc TRÍCH XUẤT trung thực bài làm của học sinh
+        String prompt = "Bạn là máy quét OCR bài thi Hóa học chuyên nghiệp. Nhiệm vụ của bạn là đọc ảnh và trích xuất dữ liệu trung thực theo định dạng JSON:\n" +
+                "{\n" +
+                "  \"student_name\": \"Họ tên học sinh\",\n" +
+                "  \"part_1\": [{\"question\": 1, \"choice\": \"A\"}, ...],\n" +
+                "  \"part_2\": [{\"question\": 1, \"answers\": {\"a\": \"Đ\", \"b\": \"S\", \"c\": \"Đ\", \"d\": \"S\"}}, ...],\n" +
+                "  \"part_3\": [{\"question\": 1, \"value\": \"12.5\"}, ...]\n" +
+                "}\n" +
+                "Lưu ý: Chỉ trả về JSON, không giải thích. Nếu không đọc được câu nào, hãy để giá trị là null hoặc chuỗi trống.";
 
-        // Prompt ép AI làm việc kỹ càng
-        String strictPrompt = "Bạn là máy chấm thi THPT Quốc gia 2025. Trích xuất nội dung:\n" +
-        "1. Họ tên học sinh: (Dòng đầu).\n" +
-        "2. Đáp án phần I: Ghi dạng 'Câu X: Y' (Ví dụ: Câu 1: A).\n" +
-        "3. Đáp án phần II (Đúng/Sai): Ghi dạng 'Câu X: (a) Đ (b) S (c) S (d) Đ'.\n" +
-        "LƯU Ý: Tuyệt đối dùng chữ 'Đ' cho Đúng và 'S' cho Sai. Không được bỏ sót bất kỳ ý (a), (b), (c), (d) nào.";
+        Map<String, Object> body = Map.of(
+            "contents", List.of(Map.of("parts", List.of(
+                Map.of("text", prompt),
+                Map.of("inline_data", Map.of("mime_type", "image/jpeg", "data", base64))
+            ))),
+            "generationConfig", Map.of("response_mime_type", "application/json")
+        );
+        return callApi(url, body);
+    }
 
-        Map<String, Object> textPart = new HashMap<>();
-        textPart.put("text", strictPrompt);
+    public String generateTextResponse(String prompt) {
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+        Map<String, Object> body = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
+        return callApi(url, body);
+    }
 
-        Map<String, Object> inlineData = new HashMap<>();
-        inlineData.put("mime_type", "image/jpeg");
-        inlineData.put("data", base64Image);
-
-        Map<String, Object> content = new HashMap<>();
-        content.put("parts", Arrays.asList(textPart, Collections.singletonMap("inline_data", inlineData)));
-
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("contents", Collections.singletonList(content));
-
-        RestTemplate restTemplate = new RestTemplate();
+    private String callApi(String url, Map<String, Object> body) {
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, requestBody, Map.class);
-            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.getBody().get("candidates");
-            Map<String, Object> contentRes = (Map<String, Object>) candidates.get(0).get("content");
-            List<Map<String, Object>> parts = (List<Map<String, Object>>) contentRes.get("parts");
+            ResponseEntity<Map> res = restTemplate.postForEntity(url, new HttpEntity<>(body), Map.class);
+            List<Map> candidates = (List<Map>) res.getBody().get("candidates");
+            List<Map> parts = (List<Map>) ((Map) candidates.get(0).get("content")).get("parts");
             return (String) parts.get(0).get("text");
-        } catch (Exception e) {
-            logger.error("Lỗi gọi Gemini: {}", e.getMessage());
-            return "Lỗi API: " + e.getMessage();
-        }
+        } catch (Exception e) { return "{}"; }
     }
 }
