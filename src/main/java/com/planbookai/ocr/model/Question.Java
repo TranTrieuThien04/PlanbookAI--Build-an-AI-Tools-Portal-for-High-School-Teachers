@@ -2,30 +2,24 @@ package com.planbookai.ocr.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Entity
 @Table(name = "questions")
-@Data
+@Data // Cực kỳ quan trọng: Để tự sinh hàm setSubject, setTopic...
+@NoArgsConstructor
+@AllArgsConstructor
 public class Question {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String subject = "Chemistry"; // Scope đồ án: Hóa học
-    private String topic; // VD: "Este - Lipit"
-    private String difficultyLevel; // Dễ, Trung bình, Khó
-    
-    @Column(columnDefinition = "TEXT", nullable = false)
-    private String content; // Nội dung câu hỏi
-    
+    private String subject; // Dòng này giúp hết đỏ setSubject
+    private String topic;
+    private String difficultyLevel; // Lưu ý tên biến này
+
     @Column(columnDefinition = "TEXT")
-    private String optionsJson; // Chứa các đáp án A,B,C,D dạng JSON
-    
-    @Column(nullable = false)
-    private String correctOption; // VD: "A"
-    
-    // Người tạo câu hỏi (Staff hoặc Teacher)
-    @ManyToOne
-    @JoinColumn(name = "created_by")
-    private User createdBy;
+    private String content;
+    private String correctOption;
 }

@@ -30,7 +30,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Dùng NoOpPasswordEncoder để test trực tiếp với mật khẩu thô "123456"
         return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
     }
 

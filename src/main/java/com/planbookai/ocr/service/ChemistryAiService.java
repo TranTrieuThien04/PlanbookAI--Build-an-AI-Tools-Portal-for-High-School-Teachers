@@ -4,19 +4,13 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class ChemistryAiService {
 
     private static final Logger logger = LoggerFactory.getLogger(ChemistryAiService.class);
 
-    // Constructor injection (Giữ nguyên phong cách của sếp)
-    private final GeminiAiService geminiAiService;
-
     public ChemistryAiService(GeminiAiService geminiAiService) {
-        this.geminiAiService = geminiAiService;
     }
 
 
