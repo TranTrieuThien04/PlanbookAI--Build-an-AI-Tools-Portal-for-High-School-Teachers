@@ -27,7 +27,7 @@ public class ExamResult {
         this.createdAt = LocalDateTime.now();
     }
 
-    // --- Getter và Setter (Thầy có thể dùng Alt+Insert để gen nhanh) ---
+    // --- Getter và Setter 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getStudentName() { return studentName; }

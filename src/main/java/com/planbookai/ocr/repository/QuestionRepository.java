@@ -7,7 +7,6 @@ import java.util.List;
 
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Long> {
-    
-    // Tên hàm phải đặt đúng chuẩn Query Method của Spring Data JPA
+
     List<Question> findByTopicAndDifficultyLevel(String topic, String difficultyLevel);
 }

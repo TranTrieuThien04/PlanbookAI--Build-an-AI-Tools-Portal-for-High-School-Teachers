@@ -16,10 +16,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.*;
 
-/**
- * PlanbookAI (PBA) - OCR Test Controller
- * Trọng tâm: Hỗ trợ giáo viên Hóa học chấm điểm và phân tích kết quả.
- */
 @RestController
 @RequestMapping("/api/v1/ocr")
 public class OcrTestController {

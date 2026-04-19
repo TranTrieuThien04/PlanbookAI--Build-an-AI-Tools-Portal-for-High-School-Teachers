@@ -15,17 +15,14 @@ import java.util.Date;
 public class JwtUtils {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
 
-    // Chuỗi bí mật dùng để ký Token (Nên để dài và phức tạp)
     private String jwtSecret = "chuoibi-mat-cuc-ky-dai-va-an-toan-cho-ocr-application-2026";
     
-    // Thời gian sống của Token (ví dụ: 86400000 ms = 24 giờ)
     private int jwtExpirationMs = 86400000;
 
     private Key key() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 
-    // 1. Hàm tạo Token sau khi Login thành công
     public String generateJwtToken(Authentication authentication) {
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
@@ -37,7 +34,7 @@ public class JwtUtils {
                 .compact();
     }
 
-    // 2. Hàm lấy Username từ trong Token ra (dùng cho bộ lọc Filter)
+    // lấy Username từ trong Token ra (dùng cho bộ lọc Filter)
     public String getUserNameFromJwtToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key())
@@ -47,7 +44,7 @@ public class JwtUtils {
                 .getSubject();
     }
 
-    // 3. Hàm kiểm tra xem Token có hợp lệ, còn hạn hay bị giả mạo không
+    // kiểm tra xem Token có hợp lệ, còn hạn hay bị giả mạo không
     public boolean validateJwtToken(String authToken) {
         try {
             Jwts.parserBuilder().setSigningKey(key()).build().parse(authToken);

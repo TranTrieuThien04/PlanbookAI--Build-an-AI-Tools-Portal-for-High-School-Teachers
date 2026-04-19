@@ -56,7 +56,6 @@ public class AiAnalyticsService {
         analysis.setClassName("Lớp học mặc định"); // Thầy có thể truyền thêm className từ Controller nếu cần
 
         // Gán dữ liệu AI trả về vào các trường tương ứng
-        // Ở đây em gán tạm aiResponse vào strength và các mục khác để thầy thấy dữ liệu đổ vào DB
         analysis.setStrengthAnalysis("AI Phân tích tổng quan: " + aiResponse); 
         analysis.setWeaknessAnalysis("Dựa trên phổ điểm: Một số học sinh cần cải thiện kỹ năng làm bài trắc nghiệm.");
         analysis.setPedagogicalSuggestions("Gợi ý: Tổ chức ôn tập lại các chương có nhiều lỗi sai.");

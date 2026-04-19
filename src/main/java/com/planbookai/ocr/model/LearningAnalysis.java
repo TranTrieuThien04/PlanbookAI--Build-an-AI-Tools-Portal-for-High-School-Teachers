@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "learning_analytics")
-@Data // Tự động tạo Getter/Setter. Nếu không có @Data, thầy phải chuột phải chọn Generate Getter/Setter thủ công.
+@Data
 public class LearningAnalysis {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

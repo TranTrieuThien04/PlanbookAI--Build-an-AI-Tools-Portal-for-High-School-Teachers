@@ -6,5 +6,4 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface LearningAnalysisRepository extends JpaRepository<LearningAnalysis, Long> {
-    // Để trống cũng được, JpaRepository đã lo hết các hàm cơ bản rồi.
 }

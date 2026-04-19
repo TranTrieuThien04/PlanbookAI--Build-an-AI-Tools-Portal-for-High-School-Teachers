@@ -39,8 +39,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         // Cấp luôn 2 thẻ: 1 thẻ trần trụi và 1 thẻ có chữ ROLE_ đằng trước
         authorities.add(new SimpleGrantedAuthority(dbRole));         // Để pass qua hasAuthority()
         authorities.add(new SimpleGrantedAuthority("ROLE_" + dbRole)); // Để pass qua hasRole()
-
-        // In ra màn hình đen để anh em mình biết nó đã chạy thành công tới đây
         System.out.println("🚀 [DEBUG] Đã cấp thẻ bài: [" + dbRole + "] và [ROLE_" + dbRole + "] cho user: " + username);
 
         // 3. Trả về đối tượng User của Spring Security kèm theo quyền

@@ -4,7 +4,6 @@ public class LoginRequest {
     private String username;
     private String password;
 
-    // --- Getter và Setter (Bắt buộc phải có để Spring đọc được dữ liệu) ---
     public String getUsername() {
         return username;
     }

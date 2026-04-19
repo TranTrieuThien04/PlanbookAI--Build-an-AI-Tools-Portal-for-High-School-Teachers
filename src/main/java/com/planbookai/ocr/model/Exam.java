@@ -22,7 +22,6 @@ public class Exam {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    // --- Getter & Setter ---
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getExamCode() { return examCode; }

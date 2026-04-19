@@ -7,7 +7,7 @@ import lombok.AllArgsConstructor;
 
 @Entity
 @Table(name = "questions")
-@Data // Cực kỳ quan trọng: Để tự sinh hàm setSubject, setTopic...
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Question {
@@ -15,9 +15,9 @@ public class Question {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String subject; // Dòng này giúp hết đỏ setSubject
+    private String subject;
     private String topic;
-    private String difficultyLevel; // Lưu ý tên biến này
+    private String difficultyLevel; 
 
     @Column(columnDefinition = "TEXT")
     private String content;

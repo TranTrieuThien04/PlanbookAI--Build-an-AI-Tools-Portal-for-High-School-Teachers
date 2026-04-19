@@ -29,7 +29,7 @@ public class AuthController {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         
-        // TẠO TOKEN THẬT Ở ĐÂY
+        // TẠO TOKEN
         String jwt = jwtUtils.generateJwtToken(authentication);
 
         return ResponseEntity.ok(new JwtResponse(jwt, loginRequest.getUsername()));
